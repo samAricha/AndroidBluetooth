@@ -5,11 +5,14 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -19,8 +22,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.compose.rememberNavController
+import com.elementalist.enose.data.BluetoothService
+import com.elementalist.enose.data.BluetoothServiceNew
+import com.elementalist.enose.data.BluetoothViewModel
 import com.elementalist.enose.data.ConnectThread
+import com.elementalist.enose.data.ServiceLocator
 import com.elementalist.enose.ui.NavigationGraph
 import com.elementalist.enose.ui.screens.MainViewModel
 import com.elementalist.enose.ui.theme.ENoseTheme
@@ -34,10 +42,27 @@ class MainActivity : ComponentActivity() {
     lateinit var bluetoothAdapter: BluetoothAdapter
     lateinit var viewModel: MainViewModel
 
+    private lateinit var bluetoothViewModel: BluetoothViewModel
+    private var bluetoothService: BluetoothServiceNew? = null
+    private var serviceBound = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
+
+
+        bluetoothViewModel = ViewModelProvider(this).get(BluetoothViewModel::class.java)
+
+        // Initialize the ViewModel
+        bluetoothViewModel = ViewModelProvider(this).get(BluetoothViewModel::class.java)
+
+        // Initialize and bind to the BluetoothService via ServiceLocator
+        ServiceLocator.initBluetoothService(this)
+        ServiceLocator.bindBluetoothService(this)
+        // Pass ViewModel to BluetoothService
+        bluetoothService?.setViewModel(bluetoothViewModel)
+
 
         if (!bluetoothAdapter.isEnabled) {
             enableBluetooth()
@@ -63,6 +88,7 @@ class MainActivity : ComponentActivity() {
         filter.addAction(BluetoothDevice.ACTION_FOUND)
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         registerReceiver(mReceiver, filter)
+
 
         setContent {
             ENoseTheme {
@@ -143,6 +169,7 @@ class MainActivity : ComponentActivity() {
         if (result.resultCode == RESULT_OK) {
             Toast.makeText(this, "Bluetooth Enabled!", Toast.LENGTH_SHORT).show()
         } else {
+
             Toast.makeText(this, "Bluetooth is required for this app to run", Toast.LENGTH_SHORT)
                 .show()
             this.finish()
@@ -156,6 +183,24 @@ class MainActivity : ComponentActivity() {
     private fun enableBluetooth() {
         val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
         enableBluetoothResultLauncher.launch(enableBtIntent)
+    }
+
+
+
+
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as BluetoothServiceNew.BluetoothBinder
+            bluetoothService = binder.service
+            bluetoothService?.setViewModel(bluetoothViewModel)
+            serviceBound = true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            bluetoothService = null
+            serviceBound = false
+        }
     }
 
 

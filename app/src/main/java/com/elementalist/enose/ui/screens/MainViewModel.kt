@@ -9,14 +9,13 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.lifecycle.ViewModel
+import com.elementalist.enose.R
 import com.elementalist.enose.data.ConnectThread
 import com.elementalist.enose.util.MY_TAG
-import com.elementalist.enose.R.drawable.nok
 import com.elementalist.enose.R.drawable.ok
 
 class MainViewModel(
@@ -26,14 +25,38 @@ class MainViewModel(
     var discoveredDevices = mutableStateListOf<BluetoothDevice>()
         private set
 
+    var scanningForDevices = mutableStateOf(false)
+        private set
+
+    var selectedDevice by mutableStateOf<BluetoothDevice?>(null)
+        private set
+
+
+
+
+    var image by mutableStateOf(R.drawable.flag2)
+        private set
+
+    var connectionState by mutableStateOf(StatesOfConnectionEnum.CLIENT_STARTED)
+        private set
+
+    var lockedWeight by mutableStateOf<String?>(null)
+        private set
+
+    var currentWeight by mutableStateOf<String?>(null)
+
+    // Track whether the weight has been locked
+    var isWeightLocked by mutableStateOf(false)
+        private set
+
+
+
     fun addDiscoveredDevice(device: BluetoothDevice) {
         if (!discoveredDevices.contains(device)) {
             discoveredDevices.add(device)
         }
     }
 
-    var scanningForDevices = mutableStateOf(false)
-        private set
 
     fun scanningFinished() {
         scanningForDevices.value = false
@@ -50,11 +73,20 @@ class MainViewModel(
         Log.i(MY_TAG, "discovery started")
     }
 
-    var selectedDevice by mutableStateOf<BluetoothDevice?>(null)
-        private set
-
     fun selectDevice(device: BluetoothDevice) {
         selectedDevice = device
+    }
+
+    fun lockInWeight() {
+        lockedWeight = currentWeight
+        isWeightLocked = true
+        changeStateOfConnectivity(StatesOfConnectionEnum.WEIGHT_LOCKED)
+    }
+
+    fun restartWeighing() {
+        lockedWeight = currentWeight
+        isWeightLocked = false
+        changeStateOfConnectivity(StatesOfConnectionEnum.CLIENT_STARTED)
     }
 
     /**
@@ -63,93 +95,35 @@ class MainViewModel(
      */
     @SuppressLint("MissingPermission")
     fun startBluetoothService(){
-        changeStateOfConnectivity(StatesOfConnection.CLIENT_STARTED)
+        changeStateOfConnectivity(StatesOfConnectionEnum.CLIENT_STARTED)
         // Cancel discovery because it otherwise slows down the connection.
         bluetoothAdapter.cancelDiscovery()
         //Listen for data from selected device
         selectedDevice?.let {
             ConnectThread(it, this).start()
         }
+        changeStateOfConnectivity(StatesOfConnectionEnum.RECEIVING_RESPONSE)
     }
 
-    var displayedText by mutableStateOf(AnnotatedString(""))
-        private set
-
-    var buttonText by mutableStateOf("")
-        private set
-
-    var buttonAction by mutableStateOf({})
-
-    var image by mutableStateOf(0)
-        private set
-
-    var connectionState by mutableStateOf(StatesOfConnection.CLIENT_STARTED)
-        private set
 
     @SuppressLint("MissingPermission")
     fun changeStateOfConnectivity(
-        newState: StatesOfConnection,
+        newState: StatesOfConnectionEnum,
         dataReceived: String? = null
     ) {
         connectionState = newState
         when (newState) {
-            StatesOfConnection.CLIENT_STARTED -> {
-                val annotatedText = buildAnnotatedString {
-                    append("Listening for data from the device:\n")
-                    withStyle(style = SpanStyle(color = Color.Blue)) {
-                        append(selectedDevice!!.name)
-                    }
-                }
-                displayedText = annotatedText
-                buttonText = ""
-                image = 0
+            StatesOfConnectionEnum.CLIENT_STARTED -> {
+                image = R.drawable.flag2
             }
-            StatesOfConnection.RESPONSE_RECEIVED -> {
-                when {
-                    dataReceived.equals("1") -> {
-                        val annotatedText = buildAnnotatedString {
-                            append("Your food is ")
-                            withStyle(style = SpanStyle(color = Color.Green)) {
-                                append("good for consumption")
-                            }
-                        }
-                        displayedText = annotatedText
-                        //buttonText = "Listen again for messages from raspberry?"
-                        //buttonAction = { startBluetoothService() }
-                        buttonText = ""
-                        image = ok
-                    }
-                    dataReceived.equals("0") -> {
-                        val annotatedText = buildAnnotatedString {
-                            append("You should ")
-                            withStyle(style = SpanStyle(color = Color.Green)) {
-                                append("NOT")
-                            }
-                            append(" eat that food")
-                        }
-                        displayedText = annotatedText
-                        //buttonText = "Listen again for messages from raspberry?"
-                        //buttonAction = { startBluetoothService() }
-                        buttonText = ""
-                        image = nok
-                    }
-                    else -> {
-                        val annotatedText = buildAnnotatedString {
-                            append("Not correct response message:")
-                            withStyle(style = SpanStyle(color = Color.LightGray)) {
-                                if (dataReceived != null) {
-                                    append(dataReceived)
-                                }
-                            }
-                        }
-                        displayedText = annotatedText
-                        buttonText = ""
-                    }
-                }
+            StatesOfConnectionEnum.RECEIVING_RESPONSE -> {
+                currentWeight = dataReceived
             }
-            StatesOfConnection.ERROR -> {
-                buttonText = "Restart server?"
-                buttonAction = { startBluetoothService() }
+            StatesOfConnectionEnum.WEIGHT_LOCKED -> {
+                lockedWeight = currentWeight // Lock the current weight
+                image = ok
+            }
+            StatesOfConnectionEnum.ERROR -> {
                 val annotatedText = buildAnnotatedString {
                     append("An error occurred:")
                     withStyle(style = SpanStyle(color = Color.Red)) {
@@ -158,8 +132,7 @@ class MainViewModel(
                         }
                     }
                 }
-                displayedText = annotatedText
-                image = 0
+                image = R.drawable.harvest
             }
         }
     }

@@ -7,7 +7,8 @@ import android.util.Log
 import com.elementalist.enose.util.MY_TAG
 import com.elementalist.enose.util.myUuid
 import com.elementalist.enose.ui.screens.MainViewModel
-import com.elementalist.enose.ui.screens.StatesOfConnection
+import com.elementalist.enose.ui.screens.StatesOfConnectionEnum
+import timber.log.Timber
 import java.io.IOException
 
 /**
@@ -30,6 +31,7 @@ class BluetoothService(
             try {
                 //Read from the InputStream
                 inputStream.read(buffer)
+                Log.i(MY_TAG, "Input stream: ${String(buffer)}")
             } catch (e: IOException) {
                 Log.i(MY_TAG, "Input stream was disconnected", e)
                 break
@@ -37,12 +39,14 @@ class BluetoothService(
             // Send the obtained bytes to the UI activity.
             val text = String(buffer)
             viewModel.changeStateOfConnectivity(
-                newState = StatesOfConnection.RESPONSE_RECEIVED,
+                newState = StatesOfConnectionEnum.RECEIVING_RESPONSE,
                 dataReceived = text
             )
         }
     }
 }
+
+
 
 /**
  * A Thread to create a connection as a Client to an existing Server (the device we pass)
@@ -74,7 +78,7 @@ class ConnectThread(
             } catch (e: Exception) {
                 Log.i(MY_TAG, "connection was not successful")
                 viewModel.changeStateOfConnectivity(
-                    StatesOfConnection.ERROR,
+                    StatesOfConnectionEnum.ERROR,
                     "Error on connectivity: $e"
                 )
             }
@@ -83,6 +87,8 @@ class ConnectThread(
             BluetoothService(socket, viewModel).start()
         }
     }
+
+
 
     // Closes the connect socket and causes the thread to finish.
     fun cancel() {

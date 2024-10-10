@@ -17,12 +17,12 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun ConnectionScreen(viewModel: MainViewModel) {
-    //we observe some viewModel's variables to dynamically change the screen
-    val buttonAction = viewModel.buttonAction
-    val buttonText = viewModel.buttonText
-    val displayedText = viewModel.displayedText
     val imageShown = viewModel.image
-    val state = viewModel.connectionState
+    val connectionState = viewModel.connectionState
+    val lockedWeight = viewModel.lockedWeight
+    val currentWeight = viewModel.currentWeight
+    val isWeightLocked = viewModel.isWeightLocked
+
 
     Column(
         modifier = Modifier
@@ -30,30 +30,36 @@ fun ConnectionScreen(viewModel: MainViewModel) {
             .padding(5.dp)
             .border(5.dp, MaterialTheme.colors.secondary)
             .padding(5.dp),
-        verticalArrangement = Arrangement.SpaceAround
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        //Text for informing the user
+
+        // Dynamically display the current weight being received
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.CenterHorizontally)
-                .weight(1f, true)
+                .weight(1f),
+            contentAlignment = Alignment.Center
         ) {
-            Text(text = displayedText, textAlign = TextAlign.Center)
-        }
-        //Button for re-listening for data after a result
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, true)
-        ) {
-            //hide button if it is not needed
-            if (buttonText != "") {
-                Button(modifier = Modifier.align(Alignment.Center), onClick = { buttonAction() }) {
-                    Text(text = buttonText)
-                }
+            if (isWeightLocked) {
+                // Display locked weight when it is locked in
+                Text(
+                    text = "Locked Weight: $lockedWeight kg",
+                    style = MaterialTheme.typography.h4,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            } else {
+                // Show dynamic weight until it's locked
+                Text(
+                    text = if (currentWeight != null) "Current Weight: $currentWeight kg" else "Waiting for weight...",
+                    style = MaterialTheme.typography.h4,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
             }
         }
+
+
         //Loading / Error / OK-Image
         Box(
             modifier = Modifier
@@ -61,25 +67,94 @@ fun ConnectionScreen(viewModel: MainViewModel) {
                 .weight(6f, true)
                 .align(Alignment.CenterHorizontally)
         ) {
+            if (isWeightLocked){
+                Image(
+                    painter = painterResource(imageShown),
+                    contentDescription = "Result from sniffing",
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier
+                        .size(200.dp)
+                        .align(Alignment.Center)
+                )
+            }else{
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.Center)
+                )
+            }
+
+
+
             //We hide the image-result when it is not needed
-            when (state) {
-                StatesOfConnection.RESPONSE_RECEIVED -> {
+           /* when (connectionState) {
+                StatesOfConnectionEnum.CLIENT_STARTED, StatesOfConnectionEnum.WEIGHT_LOCKED -> {
                     Image(
                         painter = painterResource(imageShown),
                         contentDescription = "Result from sniffing",
-                        contentScale = ContentScale.FillWidth
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier
+                            .size(200.dp)
+                            .align(Alignment.Center)
                     )
                 }
-                StatesOfConnection.CLIENT_STARTED -> {
-                    CircularProgressIndicator(modifier = Modifier.fillMaxWidth())
+                StatesOfConnectionEnum.RECEIVING_RESPONSE -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .align(Alignment.Center)
+                    )
                 }
                 else -> {
                     //on error leave blank
                 }
-            }
+            } */
 
         }
 
+        // Button for re-listening for data after a result
+        if (isWeightLocked) {
+            Button(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .height(50.dp),
+                onClick = { viewModel.restartWeighing() }
+            ) {
+                Text(text = "Restart")
+            }
+        }
+
+        // Lock Weight Button at the bottom of the screen
+        if (!isWeightLocked) {
+            Button(
+                onClick = { viewModel.lockInWeight() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .height(50.dp)
+                    .align(Alignment.CenterHorizontally)
+            ) {
+                Text(text = "Lock Weight")
+            }
+        }
+
+        // Once the weight is locked, show a "Done" message
+        if (isWeightLocked) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .height(50.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Weight locked. Reading complete!",
+                    style = MaterialTheme.typography.body1,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
 
 }

@@ -103,7 +103,7 @@ fun hasSinglePermission(permission: String, context: Context): Boolean {
  */
 fun isLocationEnabled(context: Context): Boolean {
     val locationManager =
-        context.getSystemService(ComponentActivity.LOCATION_SERVICE) as LocationManager
+        context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     return locationManager.isLocationEnabled
 }
 
